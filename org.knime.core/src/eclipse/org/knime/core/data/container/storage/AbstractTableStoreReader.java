@@ -52,6 +52,7 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
 import java.lang.management.ManagementFactory;
+import java.lang.ref.WeakReference;
 import java.nio.file.Files;
 import java.util.ArrayList;
 import java.util.List;
@@ -382,8 +383,9 @@ public abstract class AbstractTableStoreReader implements KNIMEStreamConstants {
      * the hard disk. It provides additional methods for registering the iterator with a {@link Buffer} and for closing
      * the file input stream provided by the underlying table store.
      */
+    // TODO: When refactoring the core, this class should probably be dropped entirely
     public static abstract class TableStoreCloseableRowIterator extends CloseableRowIterator {
-        private Buffer m_buffer;
+        private WeakReference<Buffer> m_bufferRef;
 
         /**
          * @param buffer the buffer to set
@@ -391,13 +393,16 @@ public abstract class AbstractTableStoreReader implements KNIMEStreamConstants {
          * @since 4.0
          */
         public void setBuffer(final Buffer buffer) {
-            m_buffer = buffer;
+            m_bufferRef = new WeakReference<>(buffer);
         }
 
         /** {@inheritDoc} */
         @Override
         public final void close() {
-            m_buffer.clearIteratorInstance(this, true);
+            final Buffer buffer = m_bufferRef.get();
+            if (buffer != null) {
+                buffer.clearIteratorInstance(this, true);
+            }
         }
 
         /**
