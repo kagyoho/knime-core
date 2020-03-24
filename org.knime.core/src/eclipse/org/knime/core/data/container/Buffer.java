@@ -2637,6 +2637,7 @@ public class Buffer implements KNIMEStreamConstants {
                             return true;
                         }
                     };
+                    MemoryAlertSystem.getInstance().addListener(m_memoryAlertListener);
                 }
             }
         }
