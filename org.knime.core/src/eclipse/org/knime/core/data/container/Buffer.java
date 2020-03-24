@@ -101,7 +101,6 @@ import org.knime.core.data.DataCellSerializer;
 import org.knime.core.data.DataRow;
 import org.knime.core.data.DataTableSpec;
 import org.knime.core.data.IDataRepository;
-import org.knime.core.data.RowIterator;
 import org.knime.core.data.collection.BlobSupportDataCellIterator;
 import org.knime.core.data.collection.CellCollection;
 import org.knime.core.data.collection.CollectionDataValue;
@@ -1796,15 +1795,17 @@ public class Buffer implements KNIMEStreamConstants {
                 copy.initOutputWriter(tempFile);
             }
             int count = 1;
-            for (RowIterator it = iterator(); it.hasNext();) {
-                final BlobSupportDataRow row = (BlobSupportDataRow)it.next();
-                final int countCurrent = count;
-                exec.setProgress(count / (double)size(),
-                    () -> "Writing row " + countCurrent + " (\"" + row.getKey() + "\")");
-                exec.checkCanceled();
-                // make a deep copy of blobs if we have a version hop
-                copy.addRow(row, m_version < IVERSION, false);
-                count++;
+            try (CloseableRowIterator it = iterator()) {
+                while (it.hasNext()) {
+                    final BlobSupportDataRow row = (BlobSupportDataRow)it.next();
+                    final int countCurrent = count;
+                    exec.setProgress(count / (double)size(),
+                        () -> "Writing row " + countCurrent + " (\"" + row.getKey() + "\")");
+                    exec.checkCanceled();
+                    // make a deep copy of blobs if we have a version hop
+                    copy.addRow(row, m_version < IVERSION, false);
+                    count++;
+                }
             }
             synchronized (copy) {
                 copy.closeInternal();
