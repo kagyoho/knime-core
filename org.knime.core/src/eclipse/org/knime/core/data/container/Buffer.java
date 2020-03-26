@@ -2080,7 +2080,7 @@ public class Buffer implements KNIMEStreamConstants {
      * FromListIterators and is only weak-referenced in the outer Buffer class. This way, we make sure that the
      * reference on m_list held by the BackIntoMemoryIterator is dropped when FromListIterators are closed.
      */
-    private final class BackIntoMemoryIterator {
+    private final class BackIntoMemoryIterator extends CloseableRowIterator {
 
     	/**
     	 * The iterator for reading additional rows from disk.
@@ -2103,14 +2103,16 @@ public class Buffer implements KNIMEStreamConstants {
          */
         private BackIntoMemoryIterator(final CloseableRowIterator iterator, final long size) {
             m_iterator = iterator;
-            m_listWhileBackIntoMemory = new ArrayList<BlobSupportDataRow>((int)size);
+            m_listWhileBackIntoMemory = new ArrayList<>((int)size);
         }
 
-        private boolean hasNext() {
+        @Override
+        public boolean hasNext() {
             return m_iterator.hasNext();
         }
 
-        private DataRow next() {
+        @Override
+        public DataRow next() {
             DataRow next = m_iterator.next();
             if (!hasNext()) {
                 // ... we put the table back into the cache
@@ -2122,6 +2124,11 @@ public class Buffer implements KNIMEStreamConstants {
 
         private List<BlobSupportDataRow> getList() {
             return m_listWhileBackIntoMemory;
+        }
+
+        @Override
+        public void close() {
+            m_iterator.close();
         }
 
     }
