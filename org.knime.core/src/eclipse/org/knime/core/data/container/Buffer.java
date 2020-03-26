@@ -1631,6 +1631,7 @@ public class Buffer implements KNIMEStreamConstants {
                 m_backIntoMemoryIteratorRef = new WeakReference<BackIntoMemoryIterator>(backIntoMemoryIt);
                 final CloseableRowIterator listIt =
                     new FromListIterator(backIntoMemoryIt.getList(), backIntoMemoryIt, exec);
+                m_openIteratorSet.put(listIt, DUMMY);
                 return filter == null ? listIt : new FilterDelegateRowIterator(listIt, filter, size(), exec);
             }
 
@@ -1673,14 +1674,17 @@ public class Buffer implements KNIMEStreamConstants {
 
                 // Case 4: We are currently iterating the table back into memory and want to apply a filter.
                 else {
-                    return new FilterDelegateRowIterator(new FromListIterator(list, backIntoMemoryIt, exec), filter,
-                        size(), exec);
+                	final CloseableRowIterator listIt = new FromListIterator(list, backIntoMemoryIt, exec);
+                	m_openIteratorSet.put(listIt, DUMMY);
+                    return new FilterDelegateRowIterator(listIt, filter, size(), exec);
                 }
 
             }
 
             // Case 5: We have at least parts of the table in memory and don't want to apply a filter.
-            return new FromListIterator(list, backIntoMemoryIt, exec);
+            final CloseableRowIterator listIt = new FromListIterator(list, backIntoMemoryIt, exec);
+            m_openIteratorSet.put(listIt, DUMMY);
+            return listIt;
         }
     }
 
@@ -1953,10 +1957,9 @@ public class Buffer implements KNIMEStreamConstants {
                 BufferTracker.getInstance().bufferCleared(this);
                 m_listWhileAddRow = null;
                 CACHE.invalidate(this);
-                if (m_binFile != null) {
                 	new ArrayList<>(m_openIteratorSet.keySet()).stream().forEach(CloseableRowIterator::close);
                         m_openIteratorSet.clear();
-                    }
+                if (m_binFile != null) {
                     if (m_outputWriter != null) {
                         try {
                             m_outputWriter.close();
@@ -2247,7 +2250,6 @@ public class Buffer implements KNIMEStreamConstants {
      */
     private final class FromListIterator extends FromListFallBackFromFileIterator {
 
-        // TODO: even more importantly, it must also be closed when the buffer is cleared
         private MemoryAlertListener m_memoryAlertListener;
 
         private BackIntoMemoryIterator m_backIntoMemoryIterator;
@@ -2312,7 +2314,7 @@ public class Buffer implements KNIMEStreamConstants {
             unregisterMemoryAlertListener();
             m_openIteratorSet.remove(this);
         }
-        
+
         private void unregisterMemoryAlertListener() {
             if (m_memoryAlertListener != null) {
                 MemoryAlertSystem.getInstanceUncollected().removeListener(m_memoryAlertListener);
