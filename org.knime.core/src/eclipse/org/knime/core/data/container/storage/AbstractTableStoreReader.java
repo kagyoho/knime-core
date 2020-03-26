@@ -401,7 +401,7 @@ public abstract class AbstractTableStoreReader implements KNIMEStreamConstants {
         public final void close() {
             final Buffer buffer = m_bufferRef.get();
             if (buffer != null) {
-                buffer.clearIteratorInstance(this, true);
+                buffer.performCloseOnTableStoreCloseableRowIterator(this);
             }
         }
 

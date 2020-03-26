@@ -1923,22 +1923,18 @@ public class Buffer implements KNIMEStreamConstants {
      * Clear the argument iterator (free the allocated resources.
      *
      * @param it The iterator
-     * @param removeFromHash Whether to remove from global hash.
      */
-    public synchronized void clearIteratorInstance(final TableStoreCloseableRowIterator it, final boolean removeFromHash) {
-        String closeMes =
-                (m_binFile != null) ? "Closing input stream on \"" + m_binFile.getAbsolutePath() + "\", " : "";
+    public synchronized void performCloseOnTableStoreCloseableRowIterator(final TableStoreCloseableRowIterator it) {
+        final String closeMes =
+            (m_binFile != null) ? String.format("Closing input stream on \"%s\", ", m_binFile.getAbsolutePath()) : "";
         try {
             if (it.performClose()) {
                 m_nrOpenInputStreams.decrementAndGet();
-                logDebug(closeMes + m_nrOpenInputStreams + " remaining", null);
-                if (removeFromHash) {
+                logDebug(String.format("%s%s remaining", closeMes, m_nrOpenInputStreams), null);
                         m_openIteratorSet.remove(it);
                     }
-                }
-            }
         } catch (IOException ioe) {
-            logDebug(closeMes + "failed!", ioe);
+            logDebug(String.format("%sfailed!", closeMes), ioe);
         }
     }
 
@@ -2532,7 +2528,7 @@ public class Buffer implements KNIMEStreamConstants {
             final Buffer buffer = m_bufferRef.get();
             if (buffer != null) {
                 ASYNC_EXECUTOR.submit(new ASyncWriteCallable(buffer));
-                LOGGER.debug("Writing " + buffer.size() + " rows in order to free memory.");
+                LOGGER.debugWithFormat("Writing %d rows in order to free memory.", buffer.size());
             }
             return true;
         }
