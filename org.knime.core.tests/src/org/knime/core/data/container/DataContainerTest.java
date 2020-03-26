@@ -883,9 +883,8 @@ public class DataContainerTest extends TestCase {
         long numberOfNewListeners = MemoryAlertSystem.getNumberOfListeners() - numberOfListeners;
         Assert.assertTrue("The amount of memory alert listeners did not increase", numberOfNewListeners > 0);
 
-        // clear table synchronously via performClear, since clear could be asynchronous
-        smallSizedTable.performClear();
-        mediumSizedTable.performClear();
+        smallSizedTable.clear();
+        mediumSizedTable.clear();
 
         numberOfNewListeners = MemoryAlertSystem.getNumberOfListeners() - numberOfListeners;
         Assert.assertTrue(
