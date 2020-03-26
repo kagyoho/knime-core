@@ -540,10 +540,12 @@ public class Buffer implements KNIMEStreamConstants {
     private DataTableSpec m_spec;
 
     /**
-     * List of file iterators that look at this buffer. Need to close them when the node is reset and the file shall be
-     * deleted.
+     * Set of open (unclosed) TableStoreCloseableRowIterators and FromListIterators that look at this buffer and hold
+     * resources. While we hope that clients close them after use, we better make sure to close them when the buffer is
+     * cleared such that resources can be freed. We do not require a synchronized map here, since all methods that
+     * interact with this set are synchronized on the Buffer anyways.
      */
-    private final WeakHashMap<TableStoreCloseableRowIterator, Object> m_openIteratorSet;
+    private final Map<CloseableRowIterator, Object> m_openIteratorSet = new WeakHashMap<>();
 
     /** Dummy object for the file iterator map. */
     private static final Object DUMMY = new Object();
@@ -625,7 +627,6 @@ public class Buffer implements KNIMEStreamConstants {
         m_bufferSettings = settings;
         m_maxRowsInMem = maxRowsInMemory;
         m_lifecycle = m_bufferSettings.useLRU() ? new SoftRefLRULifecycle() : new MemorizeIfSmallLifecycle();
-        m_openIteratorSet = new WeakHashMap<>();
         CACHE.setLRUCacheSize(m_bufferSettings.getLRUCacheSize());
         /**
          * independent of the lifecycle, if maxRowsInMemory is zero, the buffer is expected to flush to disk (e.g, see
@@ -687,7 +688,6 @@ public class Buffer implements KNIMEStreamConstants {
         m_binFile = binFile;
         m_blobDir = blobDir;
         m_bufferID = bufferID;
-        m_openIteratorSet = new WeakHashMap<>();
         if (dataRepository == null) {
             LOGGER
                 .debug("no data repository set, using new instance of " + NotInWorkflowDataRepository.class.getName());
@@ -1640,9 +1640,7 @@ public class Buffer implements KNIMEStreamConstants {
             // register the table store iterator with this buffer
             tableStoreIt.setBuffer(this);
             m_nrOpenInputStreams.incrementAndGet();
-            synchronized (m_openIteratorSet) {
                 m_openIteratorSet.put(tableStoreIt, DUMMY);
-            }
             return tableStoreIt;
 
         } else {
@@ -1931,7 +1929,6 @@ public class Buffer implements KNIMEStreamConstants {
                 m_nrOpenInputStreams.decrementAndGet();
                 logDebug(closeMes + m_nrOpenInputStreams + " remaining", null);
                 if (removeFromHash) {
-                    synchronized (m_openIteratorSet) {
                         m_openIteratorSet.remove(it);
                     }
                 }
@@ -1957,9 +1954,7 @@ public class Buffer implements KNIMEStreamConstants {
                 m_listWhileAddRow = null;
                 CACHE.invalidate(this);
                 if (m_binFile != null) {
-                    synchronized (m_openIteratorSet) {
-                        m_openIteratorSet.keySet().stream().filter(f -> f != null)
-                        .forEach(f -> clearIteratorInstance(f, false));
+                	new ArrayList<>(m_openIteratorSet.keySet()).stream().forEach(CloseableRowIterator::close);
                         m_openIteratorSet.clear();
                     }
                     if (m_outputWriter != null) {
