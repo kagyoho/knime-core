@@ -2096,6 +2096,12 @@ public class Buffer implements KNIMEStreamConstants {
         private final List<BlobSupportDataRow> m_listWhileBackIntoMemory;
 
         /**
+         * Counts how many FromListIterators are referencing this iterator, such that the last FromListIterator to be
+         * disposed of may dispose of this iterator.
+         */
+        private final AtomicInteger m_fromListIteratorsPointingHere = new AtomicInteger();
+
+        /**
          * Creates a new BackIntoMemoryIterator.
          *
          * @param iterator the file-based iterator underlying this BackIntoMemoryIterator
@@ -2270,12 +2276,20 @@ public class Buffer implements KNIMEStreamConstants {
         private FromListIterator(final List<BlobSupportDataRow> list,
             final BackIntoMemoryIterator backIntoMemoryIterator, final ExecutionMonitor exec) {
             super(list, 0, (int) size() - 1, exec);
+            if (backIntoMemoryIterator != null) {
+                backIntoMemoryIterator.m_fromListIteratorsPointingHere.getAndIncrement();
+            }
             m_backIntoMemoryIterator = backIntoMemoryIterator;
             m_memoryAlertListener = new BackIntoMemoryIteratorDropper(FromListIterator.this);
             MemoryAlertSystem.getInstanceUncollected().addListener(m_memoryAlertListener);
         }
 
         private void dropBackIntoMemoryIterator() {
+            if (m_backIntoMemoryIterator != null
+                && m_backIntoMemoryIterator.m_fromListIteratorsPointingHere.decrementAndGet() == 0) {
+                m_backIntoMemoryIteratorRef = null;
+                m_backIntoMemoryIterator.close();
+            }
             m_backIntoMemoryIterator = null;
         }
 
@@ -2306,7 +2320,7 @@ public class Buffer implements KNIMEStreamConstants {
                 // once we've read all rows back into memory, ...
                 if (++m_nextIndex >= size()) {
                 	assert !backIntoMemoryIterator.hasNext() : "File iterator returns more rows than buffer contains";
-                    m_backIntoMemoryIterator = null;
+                	dropBackIntoMemoryIterator();
                 }
                 return next;
             }
@@ -2316,7 +2330,7 @@ public class Buffer implements KNIMEStreamConstants {
         public boolean hasNext() {
             final boolean hasNext = super.hasNext();
             if (!hasNext) {
-            	unregisterMemoryAlertListener();
+                releaseResources();
             }
             return hasNext;
         }
@@ -2324,11 +2338,12 @@ public class Buffer implements KNIMEStreamConstants {
         @Override
         public void close() {
             super.close();
-            unregisterMemoryAlertListener();
+            releaseResources();
             m_openIteratorSet.remove(this);
         }
 
-        private void unregisterMemoryAlertListener() {
+        private void releaseResources() {
+            dropBackIntoMemoryIterator();
             if (m_memoryAlertListener != null) {
                 MemoryAlertSystem.getInstanceUncollected().removeListener(m_memoryAlertListener);
                 m_memoryAlertListener = null;
