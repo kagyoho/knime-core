@@ -2114,6 +2114,7 @@ public class Buffer implements KNIMEStreamConstants {
 
         @Override
         public boolean hasNext() {
+            // this class and FilterDelegateRowIterator do not release resources on hasNext == false, whereas FromListIterator and FromListFallBackFromFileIterator do. Shouldn't we be consistent with these delegating iterators?
             return m_iterator.hasNext();
         }
 
