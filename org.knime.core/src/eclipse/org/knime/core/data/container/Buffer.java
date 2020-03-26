@@ -2283,6 +2283,12 @@ public class Buffer implements KNIMEStreamConstants {
             m_memoryAlertListener = new BackIntoMemoryIteratorDropper(FromListIterator.this);
             MemoryAlertSystem.getInstanceUncollected().addListener(m_memoryAlertListener);
         }
+//
+//        @Override
+//        protected void finalize() throws Throwable {
+//            super.finalize();
+//            releaseResources();
+//        }
 
         private void dropBackIntoMemoryIterator() {
             if (m_backIntoMemoryIterator != null

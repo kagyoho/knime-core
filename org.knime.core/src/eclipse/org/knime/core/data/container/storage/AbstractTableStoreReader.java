@@ -387,6 +387,15 @@ public abstract class AbstractTableStoreReader implements KNIMEStreamConstants {
     public static abstract class TableStoreCloseableRowIterator extends CloseableRowIterator {
         private WeakReference<Buffer> m_bufferRef;
 
+        @Override
+        protected void finalize() throws Throwable {
+            /* This all relates much to bug #63: The temp files are not
+             * deleted under windows. It seems that there are open streams
+             * when the VM closes. */
+            super.finalize();
+            close();
+        }
+
         /**
          * @param buffer the buffer to set
          *

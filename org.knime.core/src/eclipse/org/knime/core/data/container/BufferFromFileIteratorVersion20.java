@@ -248,16 +248,6 @@ public final class BufferFromFileIteratorVersion20 extends FromFileIterator {
         return true;
     }
 
-    /** {@inheritDoc} */
-    @Override
-    protected void finalize() throws Throwable {
-        /* This all relates much to bug #63: The temp files are not
-         * deleted under windows. It seems that there are open streams
-         * when the VM closes. */
-        super.finalize();
-        close();
-    }
-
     /**
      * Reads the blob from the given blob address.
      * @param blobAddress The address to read from.
