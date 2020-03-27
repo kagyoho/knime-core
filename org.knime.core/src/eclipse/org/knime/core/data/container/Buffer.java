@@ -547,6 +547,10 @@ public class Buffer implements KNIMEStreamConstants {
      */
     private final Map<CloseableRowIterator, Object> m_openIteratorSet = new WeakHashMap<>();
 
+    // we shall use something here that allows us to close resources when their owners have been nulled
+    // something like a WeakHashMap where not the whole entry is removed
+    // Map<TableStoreCloseableRowIterator, WeakReference<FallBackFromFileIterator>>
+
     /** Dummy object for the file iterator map. */
     private static final Object DUMMY = new Object();
 
@@ -1949,6 +1953,7 @@ public class Buffer implements KNIMEStreamConstants {
                 BufferTracker.getInstance().bufferCleared(this);
                 m_listWhileAddRow = null;
                 CACHE.invalidate(this);
+                // TODO: why?
                 	new ArrayList<>(m_openIteratorSet.keySet()).stream().forEach(CloseableRowIterator::close);
                         m_openIteratorSet.clear();
                 if (m_binFile != null) {
